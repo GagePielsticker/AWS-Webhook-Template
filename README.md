@@ -2,7 +2,7 @@
 
 ### Preface
 
-> I created this due to a need of a webhook that can processes large amounts of bursty POST request without overloading our database. To do so we are using amazons SQS Fifo queues. This ensures no message duplication and will let us process all the incoming request at a rate that we controll and wont overload any systems. This also adds a dead letter queue for messages or request that cant process after a few retries for inspection.
+> I created this due to a need of a webhook that can processes large amounts of bursty POST request without overloading our database. To do so we are using amazons SQS Fifo queues. This ensures no message duplication and will let us process all the incoming request at a rate that we control and wont overwhelm any underlying systems. This also ensures all messages will be delivered with redrive policies and a dead-letter-queue for messages that cant be delivered no matter how many retries. This also adds a dead letter queue for messages or request that cant process after a few retries for inspection.
 
 ### Architecture Diagram
 
