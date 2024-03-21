@@ -1,0 +1,216 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Scalable Webhook Template
+
+Globals:
+  Function:
+    MemorySize: 128
+    Architectures:
+      - arm64
+    Timeout: 30
+
+Resources:
+  ##########################################################################
+  #   QUEUES                                                               #
+  ##########################################################################
+  WebhookDLQQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: my-fifo-queue.fifo
+      FifoQueue: true
+      SqsManagedSseEnabled: true
+      ContentBasedDeduplication: false
+
+  WebhookQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: my-fifo-queue.fifo
+      FifoQueue: true
+      SqsManagedSseEnabled: true
+      ContentBasedDeduplication: false
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt WebhookDLQQueue.Arn
+        maxReceiveCount: 2
+
+  ##########################################################################
+  #   FUNCTIONS                                                            #
+  ##########################################################################
+  WebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/
+      Handler: index.handler
+      Runtime: nodejs20.x
+      Events:
+        LambdaSQSTrigger: #have the queue invoke the lambda
+          Type: SQS
+          Properties:
+            Queue: !GetAtt WebhookQueue.Arn
+            BatchSize: 1 #You can increase batch size, make sure to handle the logic in code though
+
+  ##########################################################################
+  #   API GATEWAY                                                          #
+  ##########################################################################
+  WebhookAPI:
+    Type: AWS::ApiGateway::RestApi
+
+  RootMethodPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref WebhookAPI
+      ResourceId: !GetAtt WebhookAPI.RootResourceId
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Credentials: !GetAtt APISQSGatewayRole.Arn
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - StatusCode: "200"
+        PassthroughBehavior: NEVER
+        RequestParameters:
+          integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
+        RequestTemplates:
+          application/json: Action=SendMessage&MessageBody=$input.body&MessageGroupId='default_group'&MessageDeduplicationId=$context.requestId #If wanting to change deduplication id or message grouping, do so here
+        Type: AWS
+        Uri: !Join
+          - ""
+          - - "arn:aws:apigateway:"
+            - !Ref "AWS::Region"
+            - :sqs:path/
+            - !Ref "AWS::AccountId"
+            - /
+            - !Sub ${WebhookQueue.QueueName}
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          StatusCode: "200"
+
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - RootMethodPOST
+    Properties:
+      RestApiId: !Ref WebhookAPI
+
+  Stage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      StageName: Prod
+      RestApiId: !Ref WebhookAPI
+      DeploymentId: !Ref Deployment
+
+  ##########################################################################
+  #   Roles                                                                #
+  ##########################################################################
+  APISQSGatewayRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - apigateway.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Policies:
+        - PolicyName: ApiGatewayLogsPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:SetQueueAttributes
+                Resource:
+                  - !GetAtt WebhookQueue.Arn
+
+  ##########################################################################
+  #   Alarms                                                               #
+  ##########################################################################
+  DLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: "Alarm for DLQ Queue"
+      Namespace: "AWS/SQS"
+      MetricName: "ApproximateNumberOfMessagesVisible"
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt WebhookDLQQueue.QueueName
+      Statistic: Sum
+      Period: 60 # You can adjust the period as per your monitoring requirements
+      EvaluationPeriods: 1
+      Threshold: 1 # Alarm triggers if there is at least one message in the DLQ
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      AlarmActions:
+        - !Ref DLQNotificationTopic # Specify the SNS topic that will trigger the email
+      TreatMissingData: notBreaching
+
+  DLQNotificationTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: "DLQ Notification Topic"
+
+  DLQNotificationSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      Protocol: "email"
+      TopicArn: !Ref DLQNotificationTopic
+      Endpoint: "ENTERYOURALERTEMAILHERE@gmail.com" # Specify your email address here
+
+  ##########################################################################
+  #   WAF                                                                   #
+  ##########################################################################
+  WebhookWAF:
+    Type: "AWS::WAFv2::WebACL"
+    Properties:
+      Name: "WebhookWAF"
+      Scope: "REGIONAL"
+      DefaultAction:
+        Allow: {}
+      Rules:
+        - Name: "AWSManagedRulesCommonRuleSet"
+          Priority: 1
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+          RuleId: "AWSManagedRulesCommonRuleSet"
+        - Name: "AWSManagedRulesKnownBadInputsRuleSet"
+          Priority: 2
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+          RuleId: "AWSManagedRulesKnownBadInputsRuleSet"
+        - Name: "AWSManagedRulesAmazonIpReputationList"
+          Priority: 3
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+          RuleId: "AWSManagedRulesAmazonIpReputationList"
+        - Name: "AWSManagedRulesAnonymousIpList"
+          Priority: 4
+          OverrideAction:
+            None: {}
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+          RuleId: "AWSManagedRulesAnonymousIpList"
+
+  ##Hook above ACL up to api gateway
+  WebACLAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/${WebhookAPI}/stages/Prod"
+      WebACLArn: !Ref WebhookWAF
+
+  ##########################################################################
+  #   Outputs                                                              #
+  ##########################################################################
+Outputs:
+  # API Gateway endpoint to be used during tests
+  ApiEndpoint:
+    Description: API Endpoint
+    Value: !Sub "https://${WebhookAPI}.execute-api.${AWS::Region}.amazonaws.com/Prod"

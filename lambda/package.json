@@ -1,0 +1,12 @@
+{
+  "name": "aws-webhook-template",
+  "version": "1.0.0",
+  "description": "A highly scalable and reliable webhook template integrating AWS's queue systems. Using SAM for infrastructure as code.",
+  "main": "./index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT"
+}
