@@ -38,7 +38,7 @@ You can see how the above is parsed in /lambda/index.js
 
 - The current throughput limit defaultly is ~300 messages per second. This can be increased by modifying the SQS to use high throughput mode but requires you to specify specific message groups based on properties in the data.
 
-- You can optionally throttle the amount of concurrent lambdas processing the messages via the lambdas trigger event in the template.
+- You can optionally throttle the amount of concurrent lambdas processing the messages via the lambdas trigger event in the template. Currently I have concurrency throttled to `50` lambdas.
 
 - Built in are the following rulesets for the WAF are as follows:
 
@@ -49,5 +49,5 @@ You can see how the above is parsed in /lambda/index.js
 - - AWSManagedRulesAnonymousIpList
 ```
 
-- If the lambda errors or its undeliverable, the SQS currently will retry sending the message to 2 times before sending it to the dead letter queue, you can change this in the template with the `maxReceiveCount` policy.
+- If the lambda errors or its undeliverable, the SQS currently will retry sending the message to `2` times before sending it to the dead letter queue, you can change this in the template with the `maxReceiveCount` policy.
 - Defaultly there is a dummy email in the template, change this to an email you would like to be alerted on message failures as well as change limits appropriately.
