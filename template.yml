@@ -47,6 +47,9 @@ Resources:
           Properties:
             Queue: !GetAtt WebhookQueue.Arn
             BatchSize: 1 #You can increase batch size, make sure to handle the logic in code though
+            Enabled: true
+            ScalingConfig:
+              MaximumConcurrency: 50 #Amount of concurrent workers available to SQS
 
   ##########################################################################
   #   API GATEWAY                                                          #
@@ -72,7 +75,7 @@ Resources:
         RequestParameters:
           integration.request.header.Content-Type: "'application/x-www-form-urlencoded'"
         RequestTemplates:
-          application/json: Action=SendMessage&MessageBody=$input.body&MessageGroupId='default_group'&MessageDeduplicationId=$context.requestId #If wanting to change deduplication id or message grouping, do so here
+          application/json: Action=SendMessage&MessageBody=$input.body&MessageGroupId=$context.requestId&MessageDeduplicationId=$context.requestId #If wanting to change deduplication id or message grouping, do so here
         Type: AWS
         Uri: !Join
           - ""

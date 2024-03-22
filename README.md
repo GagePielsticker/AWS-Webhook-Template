@@ -52,3 +52,4 @@ Body
 ### Considerations
 
 - If updating the queue names on an already deployed queue, this will break the api until the new api gateway deploys fully.
+- If you want messages to be delivered 1 at a time, you need to utilize messageGroupId on the request
