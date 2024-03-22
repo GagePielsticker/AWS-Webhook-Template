@@ -6,7 +6,7 @@
 
 ### Architecture Diagram
 
-The architecture is entirely serverless based and uses REST api's hooked up to sqs directly & WAF standard rulesets.
+The architecture is entirely serverless based, uses REST api's hooked up to sqs directly, & WAF standard rulesets.
 
 <img src="./assets/diagram.png" alt="Architecture Diagram" width="500"/>
 
