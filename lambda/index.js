@@ -6,5 +6,9 @@ export const handler = async (event, context, callback) => {
 
   //console.log(data?.my?.cool)
 
-  throw new Error("cannot process.")
+  throw new Error("cannot process.") //sends it back to queue for retry
+
+  return {
+    status: 200
+  }
 }
