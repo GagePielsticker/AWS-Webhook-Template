@@ -8,6 +8,30 @@
 
 <img src="./assets/diagram.png" alt="Architecture Diagram" width="500"/>
 
+### Example call to webhook
+
+https://xxxxxxxx.execute-api.xxxxxx.amazonaws.com/Prod/webhook
+
+`POST`
+
+Headers
+
+```json
+"Content-Type": "application/json"
+```
+
+Body
+
+```json
+{
+  "my": {
+    "cool": {
+      "data": "143454646484"
+    }
+  }
+}
+```
+
 ### Notes
 
 - This uses FIFO queue to ensure no message duplication. If changed to standard, you will have to handle duplicate checking in code.

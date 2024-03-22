@@ -16,7 +16,7 @@ Resources:
   WebhookDLQQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: my-fifo-queue.fifo
+      QueueName: WebhookFIFODLQ.fifo
       FifoQueue: true
       SqsManagedSseEnabled: true
       ContentBasedDeduplication: false
@@ -24,7 +24,7 @@ Resources:
   WebhookQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: my-fifo-queue.fifo
+      QueueName: WebhookFIFO.fifo
       FifoQueue: true
       SqsManagedSseEnabled: true
       ContentBasedDeduplication: false
@@ -53,6 +53,8 @@ Resources:
   ##########################################################################
   WebhookAPI:
     Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: "WebhookAPI"
 
   RootMethodPOST:
     Type: AWS::ApiGateway::Method
@@ -167,44 +169,68 @@ Resources:
     Properties:
       Name: "WebhookWAF"
       Scope: "REGIONAL"
+      VisibilityConfig:
+        CloudWatchMetricsEnabled: False
+        MetricName: WebhookWAFMetrics
+        SampledRequestsEnabled: False
       DefaultAction:
         Allow: {}
       Rules:
-        - Name: "AWSManagedRulesCommonRuleSet"
+        - Name: Core-Rule-Set
+          OverrideAction:
+            None: {}
+          Priority: 0
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: False
+            MetricName: WebhookWAFMetrics
+            SampledRequestsEnabled: False
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+        - Name: Known-Bad-Input
+          OverrideAction:
+            None: {}
           Priority: 1
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: False
+            MetricName: WebhookWAFMetrics
+            SampledRequestsEnabled: False
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+        - Name: Anonymous-IP
           OverrideAction:
             None: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-          RuleId: "AWSManagedRulesCommonRuleSet"
-        - Name: "AWSManagedRulesKnownBadInputsRuleSet"
           Priority: 2
+          VisibilityConfig:
+            CloudWatchMetricsEnabled: False
+            MetricName: WebhookWAFMetrics
+            SampledRequestsEnabled: False
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAnonymousIpList
+        - Name: IP-Reputation
           OverrideAction:
             None: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-          RuleId: "AWSManagedRulesKnownBadInputsRuleSet"
-        - Name: "AWSManagedRulesAmazonIpReputationList"
           Priority: 3
-          OverrideAction:
-            None: {}
           VisibilityConfig:
-            SampledRequestsEnabled: true
-          RuleId: "AWSManagedRulesAmazonIpReputationList"
-        - Name: "AWSManagedRulesAnonymousIpList"
-          Priority: 4
-          OverrideAction:
-            None: {}
-          VisibilityConfig:
-            SampledRequestsEnabled: true
-          RuleId: "AWSManagedRulesAnonymousIpList"
+            CloudWatchMetricsEnabled: False
+            MetricName: WebhookWAFMetrics
+            SampledRequestsEnabled: False
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
 
-  ##Hook above ACL up to api gateway
+  #Hook above ACL up to api gateway
   WebACLAssociation:
     Type: AWS::WAFv2::WebACLAssociation
     Properties:
       ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/${WebhookAPI}/stages/Prod"
-      WebACLArn: !Ref WebhookWAF
+      WebACLArn: !GetAtt WebhookWAF.Arn
 
   ##########################################################################
   #   Outputs                                                              #
