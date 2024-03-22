@@ -48,3 +48,7 @@ Body
 
 - If the lambda errors or its undeliverable, the SQS currently will retry sending the message to 2 times, you can change this in the template with the `maxReceiveCount` policy.
 - You can change the email recieving alerts as well as the alert limits in the templates alarm section.
+
+### Considerations
+
+- If updating the queue names on an already deployed queue, this will break the api until the new api gateway deploys fully.

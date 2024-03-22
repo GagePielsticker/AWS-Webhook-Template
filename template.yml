@@ -16,7 +16,7 @@ Resources:
   WebhookDLQQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: WebhookFIFODLQ.fifo
+      QueueName: !Sub "${AWS::StackName}-DLQ.fifo"
       FifoQueue: true
       SqsManagedSseEnabled: true
       ContentBasedDeduplication: false
@@ -24,7 +24,7 @@ Resources:
   WebhookQueue:
     Type: AWS::SQS::Queue
     Properties:
-      QueueName: WebhookFIFO.fifo
+      QueueName: !Sub "${AWS::StackName}-SQS.fifo"
       FifoQueue: true
       SqsManagedSseEnabled: true
       ContentBasedDeduplication: false
@@ -54,7 +54,7 @@ Resources:
   WebhookAPI:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: "WebhookAPI"
+      Name: !Sub "${AWS::StackName}-api"
 
   RootMethodPOST:
     Type: AWS::ApiGateway::Method
@@ -228,6 +228,11 @@ Resources:
   #Hook above ACL up to api gateway
   WebACLAssociation:
     Type: AWS::WAFv2::WebACLAssociation
+    DependsOn:
+      - WebhookAPI
+      - RootMethodPOST
+      - Deployment
+      - Stage
     Properties:
       ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/restapis/${WebhookAPI}/stages/Prod"
       WebACLArn: !GetAtt WebhookWAF.Arn
