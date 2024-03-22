@@ -12,7 +12,7 @@ The architecture is entirely serverless based, uses REST api's hooked up to sqs 
 
 ### Example call to webhook
 
-`/ POST`
+`POST` `/`
 
 Headers
 
