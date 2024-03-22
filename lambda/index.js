@@ -4,5 +4,7 @@ export const handler = async (event, context, callback) => {
    */
   let data = JSON.parse(event.Records[0].body)
 
+  //console.log(data?.my?.cool)
+
   throw new Error("cannot process.")
 }

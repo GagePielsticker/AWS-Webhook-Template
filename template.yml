@@ -30,7 +30,7 @@ Resources:
       ContentBasedDeduplication: false
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt WebhookDLQQueue.Arn
-        maxReceiveCount: 2
+        maxReceiveCount: 2 # number of retries before sending to DLQ
 
   ##########################################################################
   #   FUNCTIONS                                                            #
@@ -46,7 +46,7 @@ Resources:
           Type: SQS
           Properties:
             Queue: !GetAtt WebhookQueue.Arn
-            BatchSize: 1 #You can increase batch size, make sure to handle the logic in code though
+            BatchSize: 1
             Enabled: true
             ScalingConfig:
               MaximumConcurrency: 50 #Amount of concurrent workers available to SQS

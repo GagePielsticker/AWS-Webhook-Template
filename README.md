@@ -2,17 +2,17 @@
 
 ### Preface
 
-> I created this due to a need of a webhook that can processes large amounts of bursty POST request without overloading our database. To do so we are using amazons SQS Fifo queues. This ensures no message duplication and will let us process all the incoming request at a rate that we control and wont overwhelm any underlying systems. This also ensures all messages will be delivered with redrive policies and a dead-letter-queue for messages that cant be delivered no matter how many retries. This also adds a dead letter queue for messages or request that cant process after a few retries for inspection.
+> I created this due to a need of a webhook that can processes large amounts of bursty POST request without overloading our database. To do so we are using amazons SQS FIFO queues. This ensures no message duplication and will let us process all the incoming request at a rate that we control and wont overwhelm any underlying systems. This also will re-attempt any failed messages, and if the re-attempts fail store them in a dead letter queue for inspection or redrive.
 
 ### Architecture Diagram
+
+The architecture is entirely serverless based and uses REST api's hooked up to sqs directly & WAF standard rulesets.
 
 <img src="./assets/diagram.png" alt="Architecture Diagram" width="500"/>
 
 ### Example call to webhook
 
-https://xxxxxxxx.execute-api.xxxxxx.amazonaws.com/Prod/webhook
-
-`POST`
+`/ POST`
 
 Headers
 
@@ -25,31 +25,29 @@ Body
 ```json
 {
   "my": {
-    "cool": {
-      "data": "143454646484"
-    }
+    "cool": "data"
   }
 }
+
+You can see how the above is parsed in /lambda/index.js
 ```
 
 ### Notes
 
-- This uses FIFO queue to ensure no message duplication. If changed to standard, you will have to handle duplicate checking in code.
 - Defaultly this delivers 1 message to 1 lambda execution, you can configure batching but need to handle it in the code as well.
-- SQS triggers lambda, if the lambda function errors in any way or if the message is undeliverable to the lambda, it will be sent to the dead letter queue.
-- The current throughput limit defaultly is ~300 messages per second. This can be increased by modifying the SQS to use high throughput mode but requires you to specify specific message groups based on properties in the data.
-- You can optionally throttle the amount of concurrent lambdas processing the messages vai the lambdas trigger.
 
-- Built in are the following rulesets for the WAF
+- The current throughput limit defaultly is ~300 messages per second. This can be increased by modifying the SQS to use high throughput mode but requires you to specify specific message groups based on properties in the data.
+
+- You can optionally throttle the amount of concurrent lambdas processing the messages via the lambdas trigger event in the template.
+
+- Built in are the following rulesets for the WAF are as follows:
+
+```
 - - AWSManagedRulesCommonRuleSet
 - - AWSManagedRulesKnownBadInputsRuleSet
 - - AWSManagedRulesAmazonIpReputationList
 - - AWSManagedRulesAnonymousIpList
+```
 
-- If the lambda errors or its undeliverable, the SQS currently will retry sending the message to 2 times, you can change this in the template with the `maxReceiveCount` policy.
-- You can change the email recieving alerts as well as the alert limits in the templates alarm section.
-
-### Considerations
-
-- If updating the queue names on an already deployed queue, this will break the api until the new api gateway deploys fully.
-- If you want messages to be delivered 1 at a time, you need to utilize messageGroupId on the request
+- If the lambda errors or its undeliverable, the SQS currently will retry sending the message to 2 times before sending it to the dead letter queue, you can change this in the template with the `maxReceiveCount` policy.
+- Defaultly there is a dummy email in the template, change this to an email you would like to be alerted on message failures as well as change limits appropriately.
